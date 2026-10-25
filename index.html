@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SRTF CPU Scheduling Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <!-- Header Navigation -->
+    <header class="header">
+        <div class="header-left">
+            <div class="header-logo">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="4" y="4" width="16" height="16" rx="2"/>
+                    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M1 9h3M1 15h3M20 9h3M20 15h3"/>
+                </svg>
+            </div>
+            <div>
+                <span class="header-title">SRTF Scheduler</span>
+                <span class="header-tag">Shortest Remaining Time First · Preemptive</span>
+            </div>
+        </div>
+        <div class="header-right">
+            <div class="shortcut-hints">
+                <span class="kbd">Space</span> <span>Play / Pause</span>
+                <span class="kbd">→</span> <span>Step</span>
+                <span class="kbd">R</span> <span>Reset</span>
+            </div>
+            <div class="status-pill" id="statusBadge">Engine Idle</div>
+        </div>
+    </header>
+
+    <main class="layout">
+        <!-- Sidebar: Process Configuration -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <div class="section-title">Add Process</div>
+
+                <div class="form-group">
+                    <label class="form-label">Application</label>
+                    <div class="app-picker">
+                        <div class="app-picker-icon" id="appSelectLogo"></div>
+                        <select id="appSelect" onchange="onAppSelectChange()">
+                            <optgroup label="Browsers">
+                                <option value="Chrome" selected>Google Chrome</option>
+                                <option value="Firefox">Mozilla Firefox</option>
+                                <option value="Edge">Microsoft Edge</option>
+                            </optgroup>
+                            <optgroup label="Streaming">
+                                <option value="Netflix">Netflix</option>
+                                <option value="YouTube">YouTube</option>
+                                <option value="Spotify">Spotify</option>
+                                <option value="Prime Video">Prime Video</option>
+                            </optgroup>
+                            <optgroup label="Communication">
+                                <option value="WhatsApp">WhatsApp</option>
+                                <option value="Instagram">Instagram</option>
+                                <option value="Discord">Discord</option>
+                                <option value="Twitter">X / Twitter</option>
+                            </optgroup>
+                            <optgroup label="Productivity">
+                                <option value="Amazon">Amazon</option>
+                                <option value="Zoom">Zoom Meetings</option>
+                                <option value="Slack">Slack</option>
+                                <option value="VS Code">VS Code</option>
+                            </optgroup>
+                            <optgroup label="System">
+                                <option value="Antivirus">Antivirus</option>
+                                <option value="Updater">System Updater</option>
+                                <option value="Backup">Cloud Backup</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label" for="arrivalTime">Arrival Time (AT)</label>
+                        <input type="number" id="arrivalTime" min="0" value="0" placeholder="0">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="burstTime">Burst Time (BT)</label>
+                        <input type="number" id="burstTime" min="1" value="4" placeholder="4">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary" id="addProcessBtn" onclick="addProcess()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+                    Add to Queue
+                </button>
+            </div>
+
+            <!-- Presets -->
+            <div class="sidebar-section">
+                <div class="section-title">Workload Presets</div>
+                <div class="preset-group">
+                    <button class="btn btn-secondary" onclick="loadPreset('mixed')">Mixed Workload (6 Apps)</button>
+                    <button class="btn btn-secondary" onclick="loadPreset('streaming')">Streaming Heavy (5 Apps)</button>
+                    <button class="btn btn-secondary" onclick="loadPreset('social')">Social & Chat (5 Apps)</button>
+                </div>
+            </div>
+
+            <!-- Configured Processes -->
+            <div class="sidebar-section sidebar-section-grow">
+                <div class="section-header-row">
+                    <span class="section-title">Configured (<span id="processCount">0</span>)</span>
+                    <button class="btn-link" id="clearAllBtn" onclick="clearAll()" style="display:none">Clear All</button>
+                </div>
+                <div class="process-list" id="processList">
+                    <div class="empty-state">No processes added yet</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Workspace -->
+        <section class="content">
+            <!-- Controls Bar -->
+            <div class="toolbar">
+                <div class="toolbar-left">
+                    <button class="btn-tool" id="startBtn" onclick="startSimulation()" disabled title="Start (Space)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="6,3 20,12 6,21"/></svg>
+                        <span>Run</span>
+                    </button>
+                    <button class="btn-tool" id="pauseBtn" onclick="pauseSimulation()" disabled title="Pause (Space)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                        <span>Pause</span>
+                    </button>
+                    <button class="btn-tool" id="stepBtn" onclick="stepSimulation()" disabled title="Step 1ms (→)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 14,12 5,21"/><rect x="16" y="4" width="3" height="16"/></svg>
+                        <span>Step</span>
+                    </button>
+                    <button class="btn-tool" id="resetBtn" onclick="resetSimulation()" disabled title="Reset (R)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+                        <span>Reset</span>
+                    </button>
+                </div>
+
+                <div class="toolbar-divider"></div>
+
+                <div class="speed-group">
+                    <span class="toolbar-label">Speed</span>
+                    <input type="range" id="speedSlider" min="1" max="10" value="5">
+                    <span class="speed-indicator" id="speedLabel">1x</span>
+                </div>
+
+                <div class="toolbar-right">
+                    <span class="toolbar-label">Timeline Clock</span>
+                    <div class="time-display">
+                        <span class="time-number" id="currentTime">0</span>
+                        <span class="time-unit">ms</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Preemption Alert Banner (Animated on Preemption) -->
+            <div class="preempt-banner" id="preemptBanner" style="display: none;">
+                <div class="preempt-badge">PREEMPTION</div>
+                <span class="preempt-text" id="preemptBannerText">Process preempted</span>
+            </div>
+
+            <!-- CPU Core Status & Ready Queue -->
+            <div class="dashboard-grid">
+                <!-- CPU Core Card with Idle Animation -->
+                <div class="panel cpu-panel" id="cpuCard">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <span class="panel-title">CPU Core Unit</span>
+                            <span class="cpu-state-tag" id="cpuStateTag">IDLE</span>
+                        </div>
+                        <span class="panel-hint">SRTF Preemptive</span>
+                    </div>
+
+                    <div class="cpu-body">
+                        <!-- Animated Core Visual (Idle Breathing / Active Spinning Ring) -->
+                        <div class="cpu-core-wrapper">
+                            <div class="cpu-core-visual idle" id="cpuCoreAnim">
+                                <div class="core-orbit core-orbit-outer"></div>
+                                <div class="core-orbit core-orbit-inner"></div>
+                                <div class="core-scan-beam"></div>
+                                <div class="core-center-slot" id="cpuIconSlot">
+                                    <!-- Dynamic Logo or Idle Icon -->
+                                </div>
+                            </div>
+                            <div class="cpu-job-details">
+                                <div class="cpu-job-header">
+                                    <span class="cpu-job-name" id="cpuLabel">CORE IDLE</span>
+                                    <span class="cpu-live-dot" id="cpuLiveDot"></span>
+                                </div>
+                                <div class="cpu-job-meta" id="cpuSub">Awaiting next ready process</div>
+                            </div>
+                        </div>
+
+                        <!-- Progress Bar for Running Process -->
+                        <div class="progress-container">
+                            <div class="progress-bar-track">
+                                <div class="progress-bar-fill" id="cpuProgressBar" style="width: 0%"></div>
+                            </div>
+                            <div class="progress-labels">
+                                <span id="cpuProgressText">0 / 0 ms elapsed</span>
+                                <span id="cpuProgressPct">0%</span>
+                            </div>
+                        </div>
+
+                        <div class="cpu-meta-grid">
+                            <div class="meta-item">
+                                <span class="meta-label">Active Job</span>
+                                <span class="meta-value" id="execProcess">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Remaining Time</span>
+                                <span class="meta-value" id="remainingTime">—</span>
+                            </div>
+                            <div class="meta-item">
+                                <span class="meta-label">Waiting in Queue</span>
+                                <span class="meta-value" id="readyCount">0</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Ready Queue Panel -->
+                <div class="panel rq-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-group">
+                            <span class="panel-title">Ready Queue</span>
+                            <span class="count-badge" id="rqBadge">0 waiting</span>
+                        </div>
+                        <span class="panel-hint">Priority: Shortest Remaining Burst</span>
+                    </div>
+
+                    <div class="rq-body">
+                        <div class="ready-queue-list" id="readyQueue">
+                            <!-- Process queue rows -->
+                        </div>
+                    </div>
+
+                    <div class="rq-footer" id="rqUpcoming">
+                        <!-- Upcoming processes -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Gantt Chart Timeline -->
+            <div class="panel gantt-panel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <span class="panel-title">Gantt Execution Timeline</span>
+                        <span class="panel-sub" id="ganttStatus">Timeline builds tick by tick in real-time</span>
+                    </div>
+                    <span class="panel-hint">Preemptive SRTF Visualization</span>
+                </div>
+                <div class="gantt-scroll">
+                    <div class="gantt" id="ganttChart">
+                        <!-- Populated with blocks & timeline -->
+                    </div>
+                    <div class="gantt-ticks" id="ganttTimeline">
+                        <!-- Real-time tick scale ruler -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Summary KPI Strip -->
+            <div class="metrics-strip">
+                <div class="metric-pill">
+                    <div class="pill-info">
+                        <span class="pill-label">Avg Waiting Time</span>
+                        <span class="pill-sub">TAT − BT</span>
+                    </div>
+                    <span class="pill-val" id="avgWT">—</span>
+                </div>
+                <div class="metric-pill">
+                    <div class="pill-info">
+                        <span class="pill-label">Avg Turnaround</span>
+                        <span class="pill-sub">CT − AT</span>
+                    </div>
+                    <span class="pill-val" id="avgTAT">—</span>
+                </div>
+                <div class="metric-pill">
+                    <div class="pill-info">
+                        <span class="pill-label">CPU Utilization</span>
+                        <span class="pill-sub">Busy / Makespan</span>
+                    </div>
+                    <span class="pill-val" id="cpuUtil">—</span>
+                </div>
+                <div class="metric-pill">
+                    <div class="pill-info">
+                        <span class="pill-label">Total Makespan</span>
+                        <span class="pill-sub">Completion Time</span>
+                    </div>
+                    <span class="pill-val" id="totalTime">—</span>
+                </div>
+            </div>
+
+            <!-- Process Metrics Table (Prominent & Real-Time) -->
+            <div class="panel table-panel" id="tablePanel">
+                <div class="panel-header">
+                    <div class="panel-title-group">
+                        <span class="panel-title">Process Metrics & Scheduling Table</span>
+                        <span class="count-badge" id="tableCountBadge">Live tracking</span>
+                    </div>
+                    <span class="panel-hint">Updates live on arrivals, preemptions, and completions</span>
+                </div>
+                <div class="table-wrap">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Process</th>
+                                <th>Status</th>
+                                <th>Arrival (AT)</th>
+                                <th>Burst (BT)</th>
+                                <th>Remaining</th>
+                                <th>Completion (CT)</th>
+                                <th>Turnaround (TAT)</th>
+                                <th>Waiting (WT)</th>
+                                <th>Response (RT)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody">
+                            <!-- Populated in real-time -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- System Event Log -->
+            <div class="panel log-panel collapsed" id="logCard">
+                <div class="panel-header clickable" onclick="toggleLog()">
+                    <div class="panel-title-group">
+                        <span class="panel-title">Scheduler Decision Journal</span>
+                        <span class="count-badge" id="logCount">0 events</span>
+                    </div>
+                    <svg class="chevron-icon" id="logChevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+                <div class="log-body" id="logBody">
+                    <div class="event-log" id="eventLog">
+                        <span class="log-placeholder">Dispatches, arrivals, and preemptions will appear here</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
