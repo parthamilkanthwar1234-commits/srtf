@@ -22,12 +22,41 @@
             </div>
             <div>
                 <span class="header-title">SRTF Scheduler</span>
-                <span class="header-tag">Shortest Remaining Time First · Preemptive</span>
+                <span class="header-tag">Preemptive Shortest Remaining Time First</span>
             </div>
         </div>
+
+        <!-- Navigation Tabs (Multi-Page System) -->
+        <nav class="nav-tabs" aria-label="Simulator Pages">
+            <button class="nav-tab active" id="tab-simulator" onclick="switchPage('simulator')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                <span>Live Simulator</span>
+            </button>
+            <button class="nav-tab" id="tab-comparison" onclick="switchPage('comparison')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                <span>Algorithm Comparison</span>
+            </button>
+            <button class="nav-tab" id="tab-quiz" onclick="switchPage('quiz')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                <span>Preemption Quiz</span>
+            </button>
+            <button class="nav-tab" id="tab-theory" onclick="switchPage('theory')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <span>Theory & Formulas</span>
+            </button>
+        </nav>
+
         <div class="header-right">
+            <!-- Theme Toggle Button -->
+            <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Switch Light / Dark Theme">
+                <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                </svg>
+                <span id="themeLabel">Slate Mode</span>
+            </button>
+
             <div class="shortcut-hints">
-                <span class="kbd">Space</span> <span>Play / Pause</span>
+                <span class="kbd">Space</span> <span>Play</span>
                 <span class="kbd">→</span> <span>Step</span>
                 <span class="kbd">R</span> <span>Reset</span>
             </div>
@@ -37,7 +66,7 @@
 
     <main class="layout">
         <!-- Sidebar: Process Configuration -->
-        <aside class="sidebar">
+        <aside class="sidebar" id="simSidebar">
             <div class="sidebar-section">
                 <div class="section-title">Add Process</div>
 
@@ -118,7 +147,7 @@
         </aside>
 
         <!-- Main Workspace -->
-        <section class="content">
+        <section class="content" id="simContent">
             <!-- Controls Bar -->
             <div class="toolbar">
                 <div class="toolbar-left">
@@ -339,6 +368,164 @@
                 <div class="log-body" id="logBody">
                     <div class="event-log" id="eventLog">
                         <span class="log-placeholder">Dispatches, arrivals, and preemptions will appear here</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 2: Algorithm Comparison Benchmark -->
+        <section class="subpage" id="pageComparison" style="display: none;">
+            <div class="subpage-hero">
+                <div>
+                    <h2 class="subpage-hero-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                        Algorithm Benchmark & Comparative Analytics
+                    </h2>
+                    <p class="subpage-hero-desc">Side-by-side benchmark of the current workload evaluated across 4 core CPU scheduling algorithms.</p>
+                </div>
+                <button class="btn btn-primary" onclick="runAlgorithmComparison()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                    Re-run Comparison
+                </button>
+            </div>
+
+            <div class="comp-grid">
+                <!-- Comparative Metrics Table -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Algorithmic Performance Matrix</span>
+                        <span class="panel-hint">Current Workload: <strong id="compProcCount">6</strong> Processes</span>
+                    </div>
+                    <div class="comp-table-wrap">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Algorithm</th>
+                                    <th>Type</th>
+                                    <th>Avg Waiting Time</th>
+                                    <th>Avg Turnaround</th>
+                                    <th>Context Switches</th>
+                                    <th>Optimal Rating</th>
+                                </tr>
+                            </thead>
+                            <tbody id="compTableBody">
+                                <!-- Generated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Theory Insights Card -->
+                <div class="panel">
+                    <div class="panel-header">
+                        <span class="panel-title">Algorithmic Insights</span>
+                    </div>
+                    <div style="padding: 16px; display: flex; flex-direction: column; gap: 12px; font-size: 0.8rem; line-height: 1.6; color: var(--text-secondary);">
+                        <div style="padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);">
+                            <strong style="color: var(--primary);">Optimal Average Waiting Time:</strong>
+                            <p style="margin-top: 4px;">SRTF is mathematically proven to minimize average waiting time for any given set of processes with known burst times by giving priority to shortest remaining work.</p>
+                        </div>
+                        <div style="padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);">
+                            <strong style="color: var(--warning);">Convoy Effect Elimination:</strong>
+                            <p style="margin-top: 4px;">Unlike FCFS where short jobs get stuck behind CPU-heavy tasks, SRTF immediately interrupts long jobs upon short arrival, preventing pipeline stalling.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Visual Comparative Gantt Bars -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span class="panel-title">Comparative Execution Timelines</span>
+                    <span class="panel-hint">Visualizing execution orders across scheduling strategies</span>
+                </div>
+                <div style="padding: 16px; display: flex; flex-direction: column; gap: 14px;" id="compGanttContainer">
+                    <!-- Dynamic comparison bars -->
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE 3: Interactive Preemption Quiz -->
+        <section class="subpage" id="pageQuiz" style="display: none;">
+            <div class="subpage-hero">
+                <div>
+                    <h2 class="subpage-hero-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                        Preemption Challenge & Interactive Quiz
+                    </h2>
+                    <p class="subpage-hero-desc">Interactive decision scenarios testing Preemptive Shortest Remaining Time First logic.</p>
+                </div>
+                <div style="font-family: var(--font-mono); font-weight: 700; font-size: 0.9rem; background: var(--panel); padding: 8px 14px; border-radius: var(--radius); border: 1px solid var(--border);">
+                    Score: <span id="quizScoreText" style="color: var(--primary);">0</span> / 4 Correct
+                </div>
+            </div>
+
+            <div class="quiz-container" id="quizContainer">
+                <!-- Dynamically populated quiz questions -->
+            </div>
+        </section>
+
+        <!-- PAGE 4: OS Theory & Mathematical Guide -->
+        <section class="subpage" id="pageTheory" style="display: none;">
+            <div class="subpage-hero">
+                <div>
+                    <h2 class="subpage-hero-title">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        Operating Systems Theory & Formal Equations
+                    </h2>
+                    <p class="subpage-hero-desc">Formal definitions, mathematical formulas, Gantt derivation, and starvation analysis.</p>
+                </div>
+            </div>
+
+            <div class="theory-grid">
+                <div class="theory-card">
+                    <h3 class="theory-title">1. Algorithm Formal Definition</h3>
+                    <p class="theory-text">
+                        Shortest Remaining Time First (SRTF) is the preemptive variant of the Shortest Job First (SJF) scheduling algorithm. At every time unit <em>t</em>, the CPU scheduler selects the process from the Ready Queue that requires the least remaining execution time to complete.
+                    </p>
+                    <div class="formula-pill">
+                        <span>Preemption Condition:</span>
+                        <span class="formula-highlight">Remaining(P_new) &lt; Remaining(P_running)</span>
+                    </div>
+                </div>
+
+                <div class="theory-card">
+                    <h3 class="theory-title">2. Fundamental Scheduling Metrics</h3>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <div class="formula-pill">
+                            <span>Turnaround Time (TAT)</span>
+                            <span class="formula-highlight">TAT = CT − AT</span>
+                        </div>
+                        <div class="formula-pill">
+                            <span>Waiting Time (WT)</span>
+                            <span class="formula-highlight">WT = TAT − BT</span>
+                        </div>
+                        <div class="formula-pill">
+                            <span>Response Time (RT)</span>
+                            <span class="formula-highlight">RT = First CPU Time − AT</span>
+                        </div>
+                        <div class="formula-pill">
+                            <span>CPU Utilization (%)</span>
+                            <span class="formula-highlight">(Σ Burst / Makespan) × 100%</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="theory-card">
+                    <h3 class="theory-title">3. Provable Optimality</h3>
+                    <p class="theory-text">
+                        By Smith’s Rule and the exchange argument, scheduling ready jobs in monotonically increasing order of remaining execution time minimizes the sum of completion times: <strong>Σ CTᵢ = minimum</strong>.
+                        Dividing by <em>n</em> minimizes both the average Turnaround Time (TAT) and average Waiting Time (WT). No uniprocessor scheduling algorithm can achieve a strictly lower average waiting time on identical workloads.
+                    </p>
+                </div>
+
+                <div class="theory-card">
+                    <h3 class="theory-title">4. Starvation & The Aging Solution</h3>
+                    <p class="theory-text">
+                        <strong>The Starvation Problem:</strong> If shorter processes continuously arrive into the ready queue, longer processes (e.g., massive batch tasks) can be repeatedly preempted and postponed indefinitely.
+                    </p>
+                    <div style="padding: 10px; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.78rem; color: var(--text-secondary); line-height: 1.5;">
+                        <strong style="color: var(--success);">The Aging Technique:</strong> Real OS kernels (like Linux CFS or Windows scheduler) gradually decrease the effective remaining time or boost the priority of aging waiting tasks over elapsed time, guaranteeing finite completion.
                     </div>
                 </div>
             </div>

@@ -235,6 +235,7 @@ const DOM = {
 
 // ── Initialization ──
 function init() {
+    initTheme();
     setupSpeedSlider();
     onAppSelectChange();
     setCpuIdle();
@@ -1128,5 +1129,429 @@ DOM.arrivalTime.addEventListener('keydown', e => {
     if (e.key === 'Enter') DOM.burstTime.focus();
 });
 
+// ── Theme Controller (Slate Light Default / Dark Toggle) ──
+function initTheme() {
+    const saved = localStorage.getItem('srtf_theme') || 'light';
+    applyTheme(saved);
+}
+
+function toggleTheme() {
+    const current = document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    const next = current === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+}
+
+function applyTheme(theme) {
+    if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        localStorage.setItem('srtf_theme', 'dark');
+        const icon = $('themeIcon');
+        const label = $('themeLabel');
+        if (label) label.textContent = 'Dark Mode';
+        if (icon) {
+            icon.innerHTML = `<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
+        }
+    } else {
+        document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('srtf_theme', 'light');
+        const icon = $('themeIcon');
+        const label = $('themeLabel');
+        if (label) label.textContent = 'Slate Light';
+        if (icon) {
+            icon.innerHTML = `
+                <circle cx="12" cy="12" r="5"/>
+                <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+            `;
+        }
+    }
+}
+
+// ── Multi-Page Navigation ──
+function switchPage(pageId) {
+    // 1. Update Tabs
+    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+    const activeTab = $(`tab-${pageId}`);
+    if (activeTab) activeTab.classList.add('active');
+
+    // 2. Hide / Show pages
+    const simSidebar = $('simSidebar');
+    const simContent = $('simContent');
+    const pageComp = $('pageComparison');
+    const pageQuiz = $('pageQuiz');
+    const pageTheory = $('pageTheory');
+
+    if (pageId === 'simulator') {
+        if (simSidebar) simSidebar.style.display = 'flex';
+        if (simContent) simContent.style.display = 'flex';
+        if (pageComp) pageComp.style.display = 'none';
+        if (pageQuiz) pageQuiz.style.display = 'none';
+        if (pageTheory) pageTheory.style.display = 'none';
+    } else {
+        if (simSidebar) simSidebar.style.display = 'none';
+        if (simContent) simContent.style.display = 'none';
+        if (pageComp) pageComp.style.display = pageId === 'comparison' ? 'flex' : 'none';
+        if (pageQuiz) pageQuiz.style.display = pageId === 'quiz' ? 'flex' : 'none';
+        if (pageTheory) pageTheory.style.display = pageId === 'theory' ? 'flex' : 'none';
+
+        if (pageId === 'comparison') runAlgorithmComparison();
+        if (pageId === 'quiz') initQuiz();
+    }
+}
+
+// ── Algorithm Comparison Engine ──
+function getProcessColor(base) {
+    const colors = {
+        'Chrome': '#ea4335',
+        'Firefox': '#ff7a00',
+        'Edge': '#0078d7',
+        'Netflix': '#e50914',
+        'YouTube': '#ff0000',
+        'Spotify': '#1db954',
+        'Prime Video': '#00a8e0',
+        'WhatsApp': '#25d366',
+        'Instagram': '#d6249f',
+        'Discord': '#5865f2',
+        'Twitter': '#0f172a',
+        'Amazon': '#ff9900',
+        'Zoom': '#2d8cff',
+        'Slack': '#36c5f0',
+        'VS Code': '#007acc',
+        'Antivirus': '#10b981',
+        'Updater': '#f59e0b',
+        'Backup': '#8b5cf6'
+    };
+    return colors[base] || '#2563eb';
+}
+
+function simulateFCFS(procs) {
+    const list = procs.map(p => ({ ...p })).sort((a, b) => a.arrivalTime - b.arrivalTime);
+    let time = 0, totalWT = 0, totalTAT = 0, switches = 0;
+    const slices = [];
+    list.forEach(p => {
+        if (time < p.arrivalTime) {
+            slices.push({ name: 'Idle', dur: p.arrivalTime - time, color: '#94a3b8' });
+            time = p.arrivalTime;
+        }
+        const ct = time + p.burstTime;
+        const tat = ct - p.arrivalTime;
+        const wt = tat - p.burstTime;
+        totalWT += wt;
+        totalTAT += tat;
+        switches++;
+        slices.push({ name: p.id.split(' ')[0], dur: p.burstTime, color: getProcessColor(p.base) });
+        time = ct;
+    });
+    return {
+        name: 'FCFS (First-Come First-Served)',
+        type: 'Non-Preemptive',
+        avgWT: (totalWT / list.length).toFixed(2),
+        avgTAT: (totalTAT / list.length).toFixed(2),
+        switches: switches,
+        slices
+    };
+}
+
+function simulateSJF(procs) {
+    const list = procs.map(p => ({ ...p, remaining: p.burstTime }));
+    let time = 0, totalWT = 0, totalTAT = 0, switches = 0, completed = 0;
+    const slices = [];
+    while (completed < list.length) {
+        const available = list.filter(p => p.arrivalTime <= time && p.remaining > 0);
+        if (available.length === 0) {
+            const nextArr = Math.min(...list.filter(p => p.remaining > 0).map(p => p.arrivalTime));
+            slices.push({ name: 'Idle', dur: nextArr - time, color: '#94a3b8' });
+            time = nextArr;
+            continue;
+        }
+        available.sort((a, b) => a.burstTime - b.burstTime || a.arrivalTime - b.arrivalTime);
+        const p = available[0];
+        const ct = time + p.burstTime;
+        const tat = ct - p.arrivalTime;
+        const wt = tat - p.burstTime;
+        totalWT += wt;
+        totalTAT += tat;
+        p.remaining = 0;
+        completed++;
+        switches++;
+        slices.push({ name: p.id.split(' ')[0], dur: p.burstTime, color: getProcessColor(p.base) });
+        time = ct;
+    }
+    return {
+        name: 'SJF (Shortest Job First)',
+        type: 'Non-Preemptive',
+        avgWT: (totalWT / list.length).toFixed(2),
+        avgTAT: (totalTAT / list.length).toFixed(2),
+        switches: switches,
+        slices
+    };
+}
+
+function simulateSRTF(procs) {
+    const list = procs.map(p => ({ ...p, remaining: p.burstTime, ct: 0 }));
+    let time = 0, totalWT = 0, totalTAT = 0, switches = 0, completed = 0, current = null;
+    const slices = [];
+    while (completed < list.length) {
+        const available = list.filter(p => p.arrivalTime <= time && p.remaining > 0);
+        if (available.length === 0) {
+            time++;
+            continue;
+        }
+        available.sort((a, b) => a.remaining - b.remaining || a.arrivalTime - b.arrivalTime);
+        const next = available[0];
+        if (current !== next) {
+            switches++;
+            current = next;
+            slices.push({ name: next.id.split(' ')[0], dur: 1, color: getProcessColor(next.base) });
+        } else {
+            slices[slices.length - 1].dur++;
+        }
+        next.remaining--;
+        time++;
+        if (next.remaining === 0) {
+            next.ct = time;
+            completed++;
+            const tat = next.ct - next.arrivalTime;
+            const wt = tat - next.burstTime;
+            totalWT += wt;
+            totalTAT += tat;
+            current = null;
+        }
+    }
+    return {
+        name: 'SRTF (Shortest Remaining Time First)',
+        type: 'Preemptive',
+        avgWT: (totalWT / list.length).toFixed(2),
+        avgTAT: (totalTAT / list.length).toFixed(2),
+        switches: switches,
+        slices,
+        isOptimal: true
+    };
+}
+
+function simulateRR(procs, quantum = 2) {
+    const list = procs.map(p => ({ ...p, remaining: p.burstTime, inQueue: false }));
+    list.sort((a, b) => a.arrivalTime - b.arrivalTime);
+    let time = 0, totalWT = 0, totalTAT = 0, switches = 0, completed = 0;
+    const queue = [];
+    const slices = [];
+
+    list.filter(p => p.arrivalTime === 0).forEach(p => { queue.push(p); p.inQueue = true; });
+
+    while (completed < list.length) {
+        if (queue.length === 0) {
+            const unarrived = list.filter(p => p.remaining > 0 && !p.inQueue);
+            if (unarrived.length > 0) {
+                const nextArr = Math.min(...unarrived.map(p => p.arrivalTime));
+                slices.push({ name: 'Idle', dur: nextArr - time, color: '#94a3b8' });
+                time = nextArr;
+                list.filter(p => p.arrivalTime <= time && p.remaining > 0 && !p.inQueue).forEach(p => {
+                    queue.push(p);
+                    p.inQueue = true;
+                });
+                continue;
+            } else {
+                break;
+            }
+        }
+
+        const p = queue.shift();
+        switches++;
+        const runTime = Math.min(quantum, p.remaining);
+        p.remaining -= runTime;
+        time += runTime;
+        slices.push({ name: p.id.split(' ')[0], dur: runTime, color: getProcessColor(p.base) });
+
+        list.filter(job => job.arrivalTime <= time && job.remaining > 0 && !job.inQueue && job !== p).forEach(job => {
+            queue.push(job);
+            job.inQueue = true;
+        });
+
+        if (p.remaining > 0) {
+            queue.push(p);
+        } else {
+            completed++;
+            const tat = time - p.arrivalTime;
+            const wt = tat - p.burstTime;
+            totalWT += wt;
+            totalTAT += tat;
+        }
+    }
+
+    return {
+        name: `Round Robin (Quantum = ${quantum}ms)`,
+        type: 'Preemptive',
+        avgWT: (totalWT / list.length).toFixed(2),
+        avgTAT: (totalTAT / list.length).toFixed(2),
+        switches: switches,
+        slices
+    };
+}
+
+function runAlgorithmComparison() {
+    if (!processes || processes.length === 0) return;
+    const countEl = $('compProcCount');
+    if (countEl) countEl.textContent = processes.length;
+
+    const srtfRes = simulateSRTF(processes);
+    const sjfRes = simulateSJF(processes);
+    const fcfsRes = simulateFCFS(processes);
+    const rrRes = simulateRR(processes, 2);
+
+    const all = [srtfRes, sjfRes, fcfsRes, rrRes];
+
+    const tbody = $('compTableBody');
+    if (tbody) {
+        tbody.innerHTML = all.map(alg => `
+            <tr>
+                <td style="font-weight:700; text-align:left; padding-left:16px;">
+                    ${alg.name}
+                </td>
+                <td><span class="status-badge ${alg.type === 'Preemptive' ? 'running' : 'waiting'}">${alg.type}</span></td>
+                <td style="font-weight:700; color: ${alg.isOptimal ? 'var(--success)' : 'var(--text)'};">
+                    ${alg.avgWT} ms
+                </td>
+                <td>${alg.avgTAT} ms</td>
+                <td>${alg.switches}</td>
+                <td>
+                    ${alg.isOptimal ? '<span class="comp-badge-optimal">★ Proven Optimal</span>' : '<span style="color:var(--text-muted); font-size:0.7rem;">Sub-optimal</span>'}
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    const ganttContainer = $('compGanttContainer');
+    if (ganttContainer) {
+        ganttContainer.innerHTML = all.map(alg => {
+            const totalDur = alg.slices.reduce((acc, s) => acc + s.dur, 0);
+            return `
+                <div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.75rem; font-weight:600; margin-bottom:4px;">
+                        <span>${alg.name}</span>
+                        <span style="font-family:var(--font-mono); color:var(--text-muted);">Avg WT: ${alg.avgWT}ms</span>
+                    </div>
+                    <div class="comp-gantt-preview">
+                        ${alg.slices.map(s => `
+                            <div class="cg-slice" style="flex: ${s.dur}; background: ${s.color};" title="${s.name} (${s.dur}ms)">
+                                ${s.dur >= 2 ? s.name : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+}
+
+// ── Interactive Preemption Quiz Engine ──
+const QUIZ_QUESTIONS = [
+    {
+        badge: 'Preemption Criteria',
+        question: 'Process A is running with 5ms remaining at t=3ms. Process B arrives with a burst time of 3ms. What action will the SRTF scheduler take?',
+        options: [
+            { text: 'Preempt Process A immediately and dispatch Process B', correct: true },
+            { text: 'Continue executing Process A until its 5ms completes', correct: false },
+            { text: 'Wait 2ms then swap to Process B', correct: false },
+            { text: 'Terminate Process A and place both in waiting queue', correct: false }
+        ],
+        explanation: 'In SRTF, preemption occurs strictly when Remaining(P_arriving) < Remaining(P_running). Since 3ms < 5ms, Process A is interrupted and Process B takes over.'
+    },
+    {
+        badge: 'Tie-Breaking Rule',
+        question: 'Two ready processes P1 and P2 both have identical remaining burst times of 4ms. P1 arrived at t=1ms and P2 arrived at t=4ms. How does the scheduler break the tie?',
+        options: [
+            { text: 'Dispatches P1 because it arrived earlier (lower Arrival Time)', correct: true },
+            { text: 'Dispatches P2 because it arrived more recently', correct: false },
+            { text: 'Divides CPU time equally between them simultaneously', correct: false },
+            { text: 'Raises a CPU scheduler exception', correct: false }
+        ],
+        explanation: 'When remaining burst times are identical, SRTF breaks ties deterministically using First-Come First-Served (earlier Arrival Time).'
+    },
+    {
+        badge: 'Starvation & Real-World OS',
+        question: 'What is the most significant operational risk of pure SRTF in an environment with high arrival rates of short jobs?',
+        options: [
+            { text: 'Starvation of long batch jobs (indefinite postponement)', correct: true },
+            { text: 'Deadlock between competing threads', correct: false },
+            { text: 'Zero CPU utilization across cores', correct: false },
+            { text: 'Memory buffer overflows', correct: false }
+        ],
+        explanation: 'If short processes continuously arrive, long jobs will never get scheduled (Starvation). Real operating systems solve this using Aging.'
+    },
+    {
+        badge: 'Formula Calculation',
+        question: 'A process arrives at t=3ms, finishes execution at t=12ms, and has a burst time of 4ms. What is its Waiting Time (WT)?',
+        options: [
+            { text: '5 ms (TAT = 12 - 3 = 9ms; WT = 9 - 4 = 5ms)', correct: true },
+            { text: '8 ms', correct: false },
+            { text: '9 ms', correct: false },
+            { text: '1 ms', correct: false }
+        ],
+        explanation: 'TAT = Completion Time − Arrival Time = 12 − 3 = 9ms. Waiting Time = TAT − Burst Time = 9 − 4 = 5ms.'
+    }
+];
+
+let quizScore = 0;
+const answeredQuestions = new Set();
+
+function initQuiz() {
+    const container = $('quizContainer');
+    if (!container || container.children.length > 0) return;
+
+    container.innerHTML = QUIZ_QUESTIONS.map((q, qIdx) => `
+        <div class="quiz-card" id="qcard-${qIdx}">
+            <span class="quiz-badge">${q.badge}</span>
+            <div class="quiz-question">${q.question}</div>
+            <div class="quiz-options">
+                ${q.options.map((opt, optIdx) => `
+                    <button class="quiz-opt-btn" onclick="answerQuiz(${qIdx}, ${optIdx}, ${opt.correct})">
+                        <span>${String.fromCharCode(65 + optIdx)}.</span>
+                        <span>${opt.text}</span>
+                    </button>
+                `).join('')}
+            </div>
+            <div class="quiz-feedback" id="qfb-${qIdx}" style="display:none;"></div>
+        </div>
+    `).join('');
+}
+
+function answerQuiz(qIdx, optIdx, isCorrect) {
+    if (answeredQuestions.has(qIdx)) return;
+    answeredQuestions.add(qIdx);
+
+    const card = $(`qcard-${qIdx}`);
+    const btns = card.querySelectorAll('.quiz-opt-btn');
+    const fb = $(`qfb-${qIdx}`);
+
+    btns.forEach((btn, idx) => {
+        btn.disabled = true;
+        if (idx === optIdx) {
+            btn.classList.add(isCorrect ? 'correct' : 'incorrect');
+        }
+        if (QUIZ_QUESTIONS[qIdx].options[idx].correct) {
+            btn.classList.add('correct');
+        }
+    });
+
+    if (isCorrect) {
+        quizScore++;
+        const scoreEl = $('quizScoreText');
+        if (scoreEl) scoreEl.textContent = quizScore;
+    }
+
+    if (fb) {
+        fb.style.display = 'block';
+        fb.className = `quiz-feedback ${isCorrect ? 'correct' : 'incorrect'}`;
+        fb.innerHTML = `<strong>${isCorrect ? '✓ Correct!' : '✗ Incorrect.'}</strong> ${QUIZ_QUESTIONS[qIdx].explanation}`;
+    }
+}
+
 // Run Init
 init();
+
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.has('page')) {
+    switchPage(urlParams.get('page'));
+}
